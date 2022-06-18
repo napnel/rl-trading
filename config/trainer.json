@@ -23,8 +23,6 @@
     "min_time_s_per_reporting": null,
     "log_level": "WARN",
     "framework": "torch",
-    "num_workers": null,
-    "num_gpus": null,
     "callbacks": null,
     "model": {},
     "horizon": 10000,

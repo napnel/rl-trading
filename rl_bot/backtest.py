@@ -112,7 +112,7 @@ class DRLStrategy(Strategy):
 def backtest(
     env,
     agent="Random",
-    save_dir: str = "./backtest-stats",
+    save_dir: Optional[str] = None,
     plot: bool = True,
     open_browser: bool = True,
     debug: bool = True,
@@ -128,5 +128,5 @@ def backtest(
     )
     stats = bt.run(env=env, agent=agent, debug=debug)
     print(stats)
-    if plot:
+    if plot and save_dir is not None:
         bt.plot(open_browser=False, filename=save_dir)

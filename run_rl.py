@@ -42,7 +42,7 @@ from rl_bot.util import get_agent_class
 # from tensortrade.env.default import create
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--algo", default="PPO", type=str)
+parser.add_argument("--algo", default="DQN", type=str)
 parser.add_argument("--local_dir", default="./ray_results", type=str)
 parser.add_argument("--expt-name", default=None, type=str)
 parser.add_argument("--num_samples", default=1, type=int)
@@ -51,9 +51,10 @@ parser.add_argument("--window_size", default=30, type=int)
 parser.add_argument("--resume", action="store_true")
 parser.add_argument("--test", action="store_true")
 parser.add_argument("--cpt", default=None, type=str)
+parser.add_argument("--pair", default="BTCUSDT", type=str)
 args = parser.parse_args()
 
-DATA_PATH = Path("./data/BTCUSDT/").resolve()
+DATA_PATH = Path.home() / "data" / args.pair
 TMP_PATH = Path("./tmp/").resolve()
 EXPERIENCE_PATH = Path("./experience/").resolve()
 CONFIG_PATH = Path("./config/").resolve()
@@ -79,7 +80,7 @@ def logger_creator(custom_path, custom_str):
         if not os.path.exists(custom_path):
             os.makedirs(custom_path)
         logdir = tempfile.mkdtemp(prefix=logdir_prefix, dir=custom_path)
-        return UnifiedLogger(config, logdir, loggers=None)
+        return UnifiedLogger(config, logdir, loggers=[CSVLogger, JsonLogger, TBXLogger])
 
     return logger_creator
 
@@ -115,7 +116,7 @@ if __name__ == "__main__":
     model_config = {
         # "use_attention": True,
         # "custom_model": tune.grid_search(["TCNNetwork", None]),
-        "custom_model": "TCNNetwork",
+        # "custom_model": "TCNNetwork",
         # "custom_model_config": {
         #     "num_channels": [256, 128, 64, 16],
         # }
@@ -130,9 +131,8 @@ if __name__ == "__main__":
         # trainer_config.update(config)
 
     print(trainer_config)
-    trainer_config["num_workers"] = args.num_cpus - 1
-    trainer_config["num_gpus"] = 0
-    # trainer_config["env"] = TradingEnv
+    # trainer_config["num_workers"] = args.num_cpus - 1
+    # trainer_config["num_gpus"] = 0
     trainer_config["env_config"]["df_path"] = str(
         DATA_PATH / "features" / "df_train.pkl"
     )
@@ -141,11 +141,7 @@ if __name__ == "__main__":
     )
     trainer_config["model"] = model_config
     trainer_config["callbacks"] = InvestmentCallbacks
-    trainer_config["logger_config"] = [
-        JsonLogger,
-        CSVLogger,
-        TBXLogger,
-    ]
+    trainer_config["num_workers"] = args.num_cpus - 1
     checkpoint_path = args.cpt
 
     if not args.test:
@@ -154,12 +150,16 @@ if __name__ == "__main__":
             config=trainer_config,
             logger_creator=logger_creator("./ray_results", args.algo),
         )
-        for _ in range(5):
+        for _ in range(10):
             results = agent.train()
             print(pretty_print(results))
             checkpoint_path = agent.save(f"./ray_results/{args.algo}")
-            print("checkpoint:", checkpoint_path)
+            metrics = results["custom_metrics"]
+            for key, values in metrics.items():
+                if "mean" in key:
+                    print(f"{key}: {values}")
 
+            print("checkpoint:", checkpoint_path)
         # analysis = train(
         #     agent_class,
         #     trainer_config,
@@ -182,11 +182,11 @@ if __name__ == "__main__":
     trainer_config["logger_config"] = {"type": ray.tune.logger.NoopLogger}
     # trainer_config["evaluation_config"] = {}
     trainer_config["num_workers"] = 1
-    agent = ppo.PPOTrainer(config=trainer_config)
+    agent = agent_class(config=trainer_config)
     agent.restore(checkpoint_path)
 
     test(agent, env_test)
-    backtest(env_train, agent, debug=False, plot=True, save_dir="train")
-    # backtest(env_test, agent, debug=False, plot=True, save_dir="test")
+    backtest(env_train, agent, debug=False, plot=True, save_dir=str(TMP_PATH / "train"))
+    backtest(env_test, agent, debug=False, plot=True, save_dir=str(TMP_PATH / "test"))
 
     ray.shutdown()

@@ -1,4 +1,6 @@
+import argparse
 import pickle
+from ast import arg
 from pathlib import Path
 
 import numpy as np
@@ -6,7 +8,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler
 
-DATA_PATH = Path("./data").resolve()
+DATA_PATH = Path.home() / "data"
 
 
 def attach_features(df: pd.DataFrame):
@@ -127,9 +129,10 @@ def simple_attach_features(df: pd.DataFrame):
     return df.dropna()
 
 
-def setup_data(pair: str, filename: str):
-    path = DATA_PATH / pair
-    df: pd.DataFrame = pd.read_pickle(path / "candlesticks" / filename)
+def extract_features(pair: str, filename: str):
+    save_path = DATA_PATH / pair / "features"
+    save_path.mkdir(parents=True, exist_ok=True)
+    df: pd.DataFrame = pd.read_pickle(DATA_PATH / pair / filename)
     assert set(df.columns) >= set(["Open", "High", "Low", "Close", "Volume"])
     df = df[-3000:]
     df = attach_features(df)
@@ -147,10 +150,10 @@ def setup_data(pair: str, filename: str):
         columns=features_list,
         index=df_test.index,
     )
-    df.to_pickle(path / "features" / "df.pkl")
-    df_train.to_pickle(path / "features" / "df_train.pkl")
-    df_test.to_pickle(path / "features" / "df_test.pkl")
-    with open(path / "features" / "scaler.pkl", "wb") as f:
+    df.to_pickle(save_path / "df.pkl")
+    df_train.to_pickle(save_path / "df_train.pkl")
+    df_test.to_pickle(save_path / "df_test.pkl")
+    with open(save_path / "scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
     print(df_train.describe())
@@ -158,6 +161,11 @@ def setup_data(pair: str, filename: str):
 
 
 if __name__ == "__main__":
-    for pair in ["BTCUSDT", "ETHUSDT"]:
-        print(pair)
-        [setup_data(pair, filename) for filename in ["5T.pkl", "15T.pkl"]]
+    pkl_files = list(DATA_PATH.glob("**/*.pkl"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pairs", nargs="+", default=["BTCUSDT", "ETHUSDT"], type=str)
+    parser.add_argument("--pkl-files", nargs="+", type=str, default=pkl_files)
+    args = parser.parse_args()
+    for pair in args.pairs:
+        for pkl_file in args.pkl_files:
+            extract_features(pair, pkl_file)
