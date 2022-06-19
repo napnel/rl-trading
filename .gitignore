@@ -130,3 +130,6 @@ dmypy.json
 data/
 ray_results/
 *.html
+videos/
+experiences/
+log/

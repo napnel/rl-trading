@@ -1,8 +1,6 @@
 import argparse
 import os
-from glob import glob
 from pathlib import Path
-from tkinter import N
 from typing import List
 
 import pandas as pd
@@ -58,14 +56,14 @@ def tranc_to_ohlcv(pairs: List[str], rules: List[str]):
             print(f"{pair}: {len(csv_files)}")
             assert len(csv_files) != 0, f"{transaction_path} has no csv file"
 
-            df = ray.get(combine_csv_files.remote(csv_files))
+            # df = ray.get(combine_csv_files.remote(csv_files))
             # df = ray.get(obj)
-            # df = pd.concat(
-            #     [
-            #         pd.read_csv(file, index_col="Datetime", parse_dates=True)
-            #         for file in csv_files
-            #     ]
-            # )
+            df = pd.concat(
+                [
+                    pd.read_csv(file, index_col="Datetime", parse_dates=True)
+                    for file in csv_files
+                ]
+            )
             df.to_pickle(save_path / "transaction.pkl")
         else:
             df = pd.read_pickle(save_path / "transaction.pkl")

@@ -133,7 +133,9 @@ def extract_features(pair: str, filename: str):
     save_path = DATA_PATH / pair / "features"
     save_path.mkdir(parents=True, exist_ok=True)
     df: pd.DataFrame = pd.read_pickle(DATA_PATH / pair / filename)
-    assert set(df.columns) >= set(["Open", "High", "Low", "Close", "Volume"])
+    assert set(df.columns) >= set(
+        ["Open", "High", "Low", "Close", "Volume"]
+    ), f"{df.columns}"
     df = df[-3000:]
     df = attach_features(df)
     features_list = [name for name in list(df.columns) if "feature_" in name]
@@ -161,7 +163,7 @@ def extract_features(pair: str, filename: str):
 
 
 if __name__ == "__main__":
-    pkl_files = list(DATA_PATH.glob("**/*.pkl"))
+    pkl_files = list(DATA_PATH.glob("**/*[TH].pkl"))
     parser = argparse.ArgumentParser()
     parser.add_argument("--pairs", nargs="+", default=["BTCUSDT", "ETHUSDT"], type=str)
     parser.add_argument("--pkl-files", nargs="+", type=str, default=pkl_files)
