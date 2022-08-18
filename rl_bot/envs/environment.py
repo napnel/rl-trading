@@ -10,7 +10,11 @@ from gym.envs.registration import EnvSpec, register
 from rl_bot.envs.components.action import ActionScheme, MarketOrder
 from rl_bot.envs.components.informe import InformerScheme, PrivateInformer
 from rl_bot.envs.components.observe import ObserverScheme, PublicObserver
-from rl_bot.envs.components.reward import LogReturn, RewardScheme
+from rl_bot.envs.components.reward import (
+    DifferentialSharpeRatio,
+    LogReturn,
+    RewardScheme,
+)
 from rl_bot.envs.components.stop import DrawdownStopper, StopperScheme
 from rl_bot.envs.core import Order, Position, Trade
 
@@ -29,7 +33,8 @@ def create_components(config: Dict[str, Any]):
         window_size=config["window_size"],
     )
     actions: ActionScheme = MarketOrder()
-    rewards: RewardScheme = LogReturn()
+    # rewards: RewardScheme = LogReturn()
+    rewards: RewardScheme = DifferentialSharpeRatio(window_size=config["window_size"])
     informer: InformerScheme = PrivateInformer()
     stopper: StopperScheme = DrawdownStopper(
         allowable_drawdown=config["allowable_drawdown"]

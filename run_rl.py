@@ -14,14 +14,8 @@ from ray.rllib.agents import Trainer, ppo
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
 from ray.rllib.models.torch.visionnet import VisionNetwork
-from ray.tune.logger import (
-    CSVLogger,
-    JsonLogger,
-    TBXLogger,
-    TBXLoggerCallback,
-    UnifiedLogger,
-    pretty_print,
-)
+from ray.tune.logger import (CSVLogger, JsonLogger, TBXLogger,
+                             TBXLoggerCallback, UnifiedLogger, pretty_print)
 from ray.tune.registry import register_env
 from ray.tune.stopper import MaximumIterationStopper
 from sklearn.model_selection import train_test_split
@@ -30,7 +24,6 @@ from ta.volatility import average_true_range
 
 from rl_bot.backtest import backtest
 from rl_bot.callbacks import InvestmentCallbacks
-
 # from rl_bot.envs import create_env
 from rl_bot.envs.environment import TradingEnv
 from rl_bot.models.batch_norm import BatchNormModel
@@ -150,7 +143,7 @@ if __name__ == "__main__":
             config=trainer_config,
             logger_creator=logger_creator("./ray_results", args.algo),
         )
-        for _ in range(10):
+        for _ in range(30):
             results = agent.train()
             print(pretty_print(results))
             checkpoint_path = agent.save(f"./ray_results/{args.algo}")
@@ -159,11 +152,11 @@ if __name__ == "__main__":
                 if "mean" in key:
                     print(f"{key}: {values}")
 
-            print("checkpoint:", checkpoint_path)
+        #     print("checkpoint:", checkpoint_path)
         # analysis = train(
         #     agent_class,
         #     trainer_config,
-        #     stop={"timesteps_total": 10000},
+        #     stop={"timesteps_total": 1000000},
         #     expt_name=args.expt_name,
         #     num_samples=args.num_samples,
         #     local_dir=args.local_dir,

@@ -1,26 +1,24 @@
+import argparse
 from pathlib import Path
 from pprint import pprint
 
 import gym
-from ray import tune
-from ray.rllib.agents import Trainer, cql, dqn, pg, ppo, sac
-
-DATA_PATH = Path("./data/BTCUSDT/").resolve()
-TMP_PATH = Path("./tmp/").resolve()
-EXPERIENCE_PATH = Path("./experience/").resolve()
-DATA_PATH.mkdir(exist_ok=True)
-TMP_PATH.mkdir(exist_ok=True)
-EXPERIENCE_PATH.mkdir(exist_ok=True)
+from ray.rllib.agents import a3c, cql, dqn, pg
 
 CONFIG = {
     "env": "MountainCar-v0",
     "framework": "torch",
 }
 
+EXPERIENCE_PATH = Path.home() / "experience" / CONFIG["env"]
+EXPERIENCE_PATH.mkdir(exist_ok=True, parents=True)
 
-def online_learning(config: dict, output: str = str(EXPERIENCE_PATH)):
-    config["output"] = output
-    agent = ppo.APPOTrainer(config=config)
+
+def online_learning(config: dict, output_path: str = str(EXPERIENCE_PATH)):
+    config["output"] = output_path
+    # agent = ppo.APPOTrainer(config=config)
+    # agent = pg.PGTrainer(config=config)
+    agent = dqn.DQNTrainer(config=config)
     num_iterations = 300
     for i in range(num_iterations):
         results = agent.train()
@@ -32,10 +30,25 @@ def online_learning(config: dict, output: str = str(EXPERIENCE_PATH)):
             break
 
 
-def offline_learning(config: dict, input: str):
+def offline_learning(config: dict, input_path: Path = EXPERIENCE_PATH):
+    data_files = [str(path) for path in input_path.glob("*.json")]
+    print(data_files)
+    config["input"] = data_files
+    config["num_workers"] = 0  # Run locally.
+    config["horizon"] = 200
+    config["soft_horizon"] = True
+    config["no_done_at_end"] = True
+    config["n_step"] = 3
+    config["bc_iters"] = 0
+    # Set up evaluation.
+    config["evaluation_num_workers"] = 1
+    config["evaluation_interval"] = 1
+    config["evaluation_duration"] = 3
+    # Evaluate on actual environment.
+    config["evaluation_config"] = {"input": "sampler"}
     agent = cql.CQLTrainer(config=config)
 
-    env = gym.make(env)
+    env = gym.make(config["env"])
     print(env.action_space, env.observation_space)
     obs = env.reset()
     done = False
@@ -44,15 +57,18 @@ def offline_learning(config: dict, input: str):
         obs, reward, done, info = env.step(action)
         env.render()
 
+
 def evaluation():
     pass
 
 
-def main():
-    online_learning(CONFIG)
-    offline_learning(CONFIG)
-
-
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--online", action="store_true")
+    parser.add_argument("--offline", action="store_true")
 
+    if parser.parse_args().offline:
+        offline_learning(CONFIG)
+
+    else:
+        online_learning(CONFIG)

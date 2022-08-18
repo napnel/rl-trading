@@ -156,6 +156,43 @@ class MarketOrder(ActionScheme):
             raise ValueError
 
 
+class LiskedMarketOrder(ActionScheme):
+    @property
+    def action_space(self) -> spaces.Box:
+        self._action_space = spaces.Discrete(5)
+        return self._action_space
+
+    def step(self, action: np.ndarray):
+        position = self.env.position
+        # if self.env.position.size != 0:
+        #     self.env.position.close()
+
+        if action == 0:
+            if not position.is_long:
+                self.env.position.close()
+                self.env.buy(size=0.75)
+
+        elif action == 1:
+            if not position.is_short:
+                self.env.position.close()
+                self.env.sell(size=0.75)
+
+        elif action == 2:
+            pass
+
+        elif action == 3:
+            pass
+
+        elif action == 4:
+            pass
+
+        elif action == 5:
+            pass
+
+        else:
+            raise ValueError
+
+
 registry = {
     "MarketOrder": MarketOrder,
     # "LimitOrder": OneWayLimitOrderV2,
