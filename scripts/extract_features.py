@@ -30,7 +30,7 @@ def attach_features(df: pd.DataFrame):
         "upper_shadow",
         "lower_shadow",
         "true_range",
-        "return_volume_pct",
+        # "return_volume_pct",
         "true_log_return",
     ]
 
@@ -52,17 +52,17 @@ def attach_features(df: pd.DataFrame):
         ).max(axis=1)
         / prev_close
     )
-    flow = np.log1p(close * volume)
-    log_volume = df["Volume"].apply(np.log)
-    features["log_volume_diff"] = log_volume.diff()
-    features["return_volume_pct"] = features["log_return"] * log_volume.diff()
-    features["rank_volume"] = log_volume.rolling(20).rank(pct=True)
+    # flow = np.log1p(close * volume)
+    # log_volume = df["Volume"].apply(np.log)
+    # features["log_volume_diff"] = log_volume.diff()
+    # features["return_volume_pct"] = features["log_return"] * log_volume.diff()
+    # features["rank_volume"] = log_volume.rolling(20).rank(pct=True)
 
     # log_volume = np.log1p(close * volume).diff()
 
     for period in [3, 5, 10, 20]:
         features[f"price_momentum_{period}"] = close / close.shift(period)
-        features[f"volume_momentum_{period}"] = log_volume / log_volume.shift(period)
+        # features[f"volume_momentum_{period}"] = log_volume / log_volume.shift(period)
         # features[f"high_low_range_{period}"] = (
         #     high.rolling(period).max() - low.rolling(period).min()
         # ) / close
@@ -82,7 +82,7 @@ def attach_features(df: pd.DataFrame):
     lag_features = pd.concat(
         [
             features[base_features].shift(lag).add_suffix(f"_lag_{lag}")
-            for lag in range(1, 3)
+            for lag in range(1, 5)
         ],
         axis=1,
     )
@@ -101,9 +101,9 @@ def attach_features(df: pd.DataFrame):
     # features = pd.concat([features, lag_features, diff_features, agg_features], axis=1)
     features = pd.concat([features, agg_features], axis=1)
     # features = features.drop(["log_volume"], axis=1)
-    features = features.add_prefix("feature_")
+    features = features.add_prefix("feature_").sort_index(axis=1)
 
-    return pd.concat([df, features], axis=1).sort_index(axis=1).dropna()
+    return pd.concat([df, features], axis=1).dropna()
 
 
 def simple_attach_features(df: pd.DataFrame):
@@ -130,17 +130,19 @@ def simple_attach_features(df: pd.DataFrame):
 
 
 def extract_features(pair: str, filename: str):
+    if isinstance(filename, Path):
+        filename = filename.name
+    time_freq = filename.strip(".pkl").split("_")[-1]
     save_path = DATA_PATH / pair / "features"
     save_path.mkdir(parents=True, exist_ok=True)
     df: pd.DataFrame = pd.read_pickle(DATA_PATH / pair / filename)
     assert set(df.columns) >= set(
         ["Open", "High", "Low", "Close", "Volume"]
     ), f"{df.columns}"
-    df = df[-3000:]
     df = attach_features(df)
     features_list = [name for name in list(df.columns) if "feature_" in name]
     print(features_list)
-    df_train, df_test = train_test_split(df, test_size=0.2, shuffle=False)
+    df_train, df_test = train_test_split(df, test_size=0.1, shuffle=False)
     scaler = RobustScaler()
     df_train[features_list] = pd.DataFrame(
         scaler.fit_transform(df_train[features_list]),
@@ -152,10 +154,10 @@ def extract_features(pair: str, filename: str):
         columns=features_list,
         index=df_test.index,
     )
-    df.to_pickle(save_path / "df.pkl")
-    df_train.to_pickle(save_path / "df_train.pkl")
-    df_test.to_pickle(save_path / "df_test.pkl")
-    with open(save_path / "scaler.pkl", "wb") as f:
+    df.to_pickle(save_path / f"df_{time_freq}.pkl")
+    df_train.to_pickle(save_path / f"df_{time_freq}_train.pkl")
+    df_test.to_pickle(save_path / f"df_{time_freq}_test.pkl")
+    with open(save_path / f"scaler_{time_freq}.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
     print(df_train.describe())
@@ -170,4 +172,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     for pair in args.pairs:
         for pkl_file in args.pkl_files:
+            print("extracting features for", pair, pkl_file)
             extract_features(pair, pkl_file)

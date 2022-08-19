@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -47,7 +47,7 @@ class ObserverScheme:
 
     @property
     def candlestick(self) -> np.ndarray:
-        ''' return current candlestick data '''
+        """return current candlestick data"""
         return self.ohlcv[self.env.current_step, :]
 
     @property
@@ -71,6 +71,50 @@ class PublicObserver(ObserverScheme):
         self,
         ohlcv: pd.DataFrame,
         features: pd.DataFrame,
+        window_size: int,
+        **kwargs,
+    ):
+        super().__init__(ohlcv, features, window_size)
+        self._observation_space = spaces.Box(
+            low=np.float32(-np.inf),
+            high=np.float32(np.inf),
+            shape=(window_size, self.features.shape[1] + 2),
+            dtype=np.float32,
+        )
+        self.positions = np.zeros((len(ohlcv), 2))
+        # self.positions = np.tile([0, 0], (self.window_size, len(ohlcv)))
+
+    @property
+    def observation_space(self) -> spaces.Box:
+        return self._observation_space
+
+    @property
+    def observation(self) -> np.ndarray:
+        features_obs = self.features[
+            self.env.current_step - self.env.window_size : self.env.current_step, :
+        ]
+        position_obs = self.positions[
+            self.env.current_step - self.env.window_size : self.env.current_step, :
+        ]
+        obs = np.hstack((features_obs, position_obs))
+        return obs
+
+    # @property
+    # def single_observation(self) -> np.ndarray:
+    #     return self.features[self.env.current_step, :]
+
+    def step(self) -> np.ndarray:
+        long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
+        short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
+        self.positions[self.env.current_step, :] = [long_position, short_position]
+        return self.observation
+
+
+class MultiTimeframeObserver(ObserverScheme):
+    def __init__(
+        self,
+        ohlcv: List[pd.DataFrame],
+        features: List[pd.DataFrame],
         window_size: int,
         **kwargs,
     ):

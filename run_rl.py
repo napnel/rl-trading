@@ -52,11 +52,11 @@ TMP_PATH = Path("./tmp/").resolve()
 EXPERIENCE_PATH = Path("./experience/").resolve()
 CONFIG_PATH = Path("./config/").resolve()
 LOG_PATH = Path("./log/").resolve()
-DATA_PATH.mkdir(exist_ok=True)
-TMP_PATH.mkdir(exist_ok=True)
-EXPERIENCE_PATH.mkdir(exist_ok=True)
-CONFIG_PATH.mkdir(exist_ok=True)
-LOG_PATH.mkdir(exist_ok=True)
+DATA_PATH.mkdir(exist_ok=True, parents=True)
+TMP_PATH.mkdir(exist_ok=True, parents=True)
+EXPERIENCE_PATH.mkdir(exist_ok=True, parents=True)
+CONFIG_PATH.mkdir(exist_ok=True, parents=True)
+LOG_PATH.mkdir(exist_ok=True, parents=True)
 ModelCatalog.register_custom_model("BatchNormModel", BatchNormModel)
 ModelCatalog.register_custom_model("RNNNetwork", RNNNetwork)
 ModelCatalog.register_custom_model("TCNNetwork", TCNNetwork)
@@ -127,10 +127,10 @@ if __name__ == "__main__":
     # trainer_config["num_workers"] = args.num_cpus - 1
     # trainer_config["num_gpus"] = 0
     trainer_config["env_config"]["df_path"] = str(
-        DATA_PATH / "features" / "df_train.pkl"
+        DATA_PATH / "features" / "df_4H_train.pkl"
     )
     trainer_config["evaluation_config"]["env_config"]["df_path"] = str(
-        DATA_PATH / "features" / "df_test.pkl"
+        DATA_PATH / "features" / "df_4H_test.pkl"
     )
     trainer_config["model"] = model_config
     trainer_config["callbacks"] = InvestmentCallbacks
@@ -176,7 +176,8 @@ if __name__ == "__main__":
     # trainer_config["evaluation_config"] = {}
     trainer_config["num_workers"] = 1
     agent = agent_class(config=trainer_config)
-    agent.restore(checkpoint_path)
+    if checkpoint_path:
+        agent.restore(checkpoint_path)
 
     test(agent, env_test)
     backtest(env_train, agent, debug=False, plot=True, save_dir=str(TMP_PATH / "train"))
