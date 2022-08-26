@@ -7,38 +7,60 @@ import gym
 import numpy as np
 import pandas as pd
 from gym.envs.registration import EnvSpec, register
-from rl_bot.envs.components.action import ActionScheme, MarketOrder
-from rl_bot.envs.components.informe import InformerScheme, PrivateInformer
-from rl_bot.envs.components.observe import ObserverScheme, PublicObserver
-from rl_bot.envs.components.reward import (
-    DifferentialSharpeRatio,
-    LogReturn,
-    RewardScheme,
-)
-from rl_bot.envs.components.stop import DrawdownStopper, StopperScheme
+from rl_bot.envs.components import action, informe, observe, reward, stop
+
+# from rl_bot.envs.components.action import ActionScheme, MarketOrder
+# from rl_bot.envs.components.informe import InformerScheme, PrivateInformer
+# from rl_bot.envs.components.observe import ObserverScheme, PublicObserver
+# from rl_bot.envs.components.reward import (DifferentialSharpeRatio, LogReturn,
+#                                            RewardScheme)
+# from rl_bot.envs.components.stop import DrawdownStopper, StopperScheme
 from rl_bot.envs.core import Order, Position, Trade
+
+# def create_components(config: Dict[str, Any]):
+#     """Create components from config."""
+#     df: pd.DataFrame = pd.read_pickle(config["df_path"])
+#     assert set(df.columns) >= set(["Open", "High", "Low", "Close", "Volume"])
+#     ohlcv = df[["Open", "High", "Low", "Close", "Volume"]]
+#     features = df.drop(["Open", "High", "Low", "Close", "Volume"], axis=1)
+#     assert features.shape[1] > 0, "No features found"
+
+#     observer: ObserverScheme = PublicObserver(
+#         ohlcv=ohlcv,
+#         features=features,
+#         window_size=config["window_size"],
+#     )
+#     actions: ActionScheme = MarketOrder()
+#     # rewards: RewardScheme = LogReturn()
+#     rewards: RewardScheme = DifferentialSharpeRatio(window_size=config["window_size"])
+#     informer: InformerScheme = PrivateInformer()
+#     stopper: StopperScheme = DrawdownStopper(
+#         allowable_drawdown=config["allowable_drawdown"]
+#     )
+#     return observer, actions, rewards, informer, stopper
 
 
 def create_components(config: Dict[str, Any]):
     """Create components from config."""
-    df: pd.DataFrame = pd.read_pickle(config["df_path"])
-    assert set(df.columns) >= set(["Open", "High", "Low", "Close", "Volume"])
-    ohlcv = df[["Open", "High", "Low", "Close", "Volume"]]
-    features = df.drop(["Open", "High", "Low", "Close", "Volume"], axis=1)
-    assert features.shape[1] > 0, "No features found"
 
-    observer: ObserverScheme = PublicObserver(
-        ohlcv=ohlcv,
-        features=features,
-        window_size=config["window_size"],
+    obs_cfg, action_cfs, rewards_cfs, informer_cfg, stopper_cfg = (
+        config["observer"],
+        config["actions"],
+        config["rewards"],
+        config["informer"],
+        config["stopper"],
     )
-    actions: ActionScheme = MarketOrder()
-    # rewards: RewardScheme = LogReturn()
-    rewards: RewardScheme = DifferentialSharpeRatio(window_size=config["window_size"])
-    informer: InformerScheme = PrivateInformer()
-    stopper: StopperScheme = DrawdownStopper(
-        allowable_drawdown=config["allowable_drawdown"]
+
+    observer: observe.ObserverScheme = observe.get(obs_cfg["type"])(obs_cfg["kwargs"])
+    actions: action.ActionScheme = action.get(action_cfs["type"])(action_cfs["kwargs"])
+    rewards: reward.RewardScheme = reward.get(rewards_cfs["type"])(
+        rewards_cfs["kwargs"]
     )
+    informer: informe.InformerScheme = informe.get(informer_cfg["type"])(
+        informer_cfg["kwargs"]
+    )
+    stopper: stop.StopperScheme = stop.get(stopper_cfg["type"])(stopper_cfg["kwargs"])
+
     return observer, actions, rewards, informer, stopper
 
 
@@ -55,8 +77,8 @@ class TradingEnv(gym.Env):
             self.informer,
             self.stopper,
         ) = create_components(config)
-        self.window_size = config["window_size"]
         self.fee = config["fee"]
+        self.window_size = self.observer.window_size
 
         self.current_step = self.window_size
         self.initial_cash = 1000000

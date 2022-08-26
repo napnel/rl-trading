@@ -1,17 +1,49 @@
 {
     "env": "TradingEnv-v1",
     "env_config": {
-        "df_path": null,
-        "window_size": 30,
         "fee": 0.0001,
-        "allowable_drawdown": 0.5
+        "observer": {
+            "type": "MultiTimeframeObserver",
+            "df_path": null,
+            "window_size": 30
+        },
+        "actions": {
+            "type": "MarketOrder"
+        },
+        "rewards": {
+            "type": "DifferentialSharpRatio",
+            "window_size": 30
+        },
+        "informer": {
+            "type": "PrivateInformer"
+        },
+        "stopper": {
+            "type": "DrawdownStoper",
+            "allowable_drawdown": 0.5
+        }
     },
     "evaluation_config": {
         "env_config": {
-            "df_path": null,
-            "window_size": 30,
             "fee": 0.0001,
-            "allowable_drawdown": 0.5
+            "observer": {
+                "type": "PublicObserver",
+                "df_path": null,
+                "window_size": 30
+            },
+            "actions": {
+                "type": "MarketOrder"
+            },
+            "rewards": {
+                "type": "DifferentialSharpRatio",
+                "window_size": 30
+            },
+            "informer": {
+                "type": "PrivateInformer"
+            },
+            "stopper": {
+                "type": "DrawdownStoper",
+                "allowable_drawdown": 0.5
+            }
         },
         "explore": false
     },

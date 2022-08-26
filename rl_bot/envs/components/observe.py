@@ -1,3 +1,5 @@
+from collections import OrderedDict
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 import numpy as np
@@ -11,26 +13,24 @@ if TYPE_CHECKING:
 class ObserverScheme:
     def __init__(
         self,
-        ohlcv: pd.DataFrame,
-        features: pd.DataFrame,
+        df_path: str,
         window_size: int,
         **kwargs,
     ):
+        df: pd.DataFrame = pd.read_pickle(df_path)
+        ohlcv = df[["Open", "High", "Low", "Close", "Volume"]]
+        # features = df.drop(["Open", "High", "Low", "Close", "Volume"], axis=1)
+        fe_cols = [col for col in df.columns if col.startswith("feture_")]
+        features = df[fe_cols]
+        assert features.shape[1] > 0, "No features found"
         assert len(ohlcv) == len(features), "lenth of ohlcv and features is diffrent"
-        assert list(ohlcv.columns) == [
-            "Open",
-            "High",
-            "Low",
-            "Close",
-            "Volume",
-        ], f"{list(ohlcv.columns)}"
+
         self.env: "TradingEnv" = None
         self._ohlcv = ohlcv
         self._features = features
         self.ohlcv = ohlcv.values
         self.features = features.values
         self.window_size = window_size
-        self.datetime = features.index
         self.prev_observation = None
 
     @property
@@ -58,6 +58,10 @@ class ObserverScheme:
     def price(self) -> float:
         return self.candlestick[3]
 
+    @property
+    def datetime(self) -> pd.DatetimeIndex:
+        return self._features.index
+
     def reset(self, env: "TradingEnv") -> np.ndarray:
         self.env = env
         return self.observation
@@ -69,20 +73,18 @@ class ObserverScheme:
 class PublicObserver(ObserverScheme):
     def __init__(
         self,
-        ohlcv: pd.DataFrame,
-        features: pd.DataFrame,
+        df_path: str,
         window_size: int,
         **kwargs,
     ):
-        super().__init__(ohlcv, features, window_size)
+        super().__init__(df_path, window_size)
         self._observation_space = spaces.Box(
             low=np.float32(-np.inf),
             high=np.float32(np.inf),
             shape=(window_size, self.features.shape[1] + 2),
             dtype=np.float32,
         )
-        self.positions = np.zeros((len(ohlcv), 2))
-        # self.positions = np.tile([0, 0], (self.window_size, len(ohlcv)))
+        self.positions = np.zeros((len(self.ohlcv), 2))
 
     @property
     def observation_space(self) -> spaces.Box:
@@ -99,10 +101,6 @@ class PublicObserver(ObserverScheme):
         obs = np.hstack((features_obs, position_obs))
         return obs
 
-    # @property
-    # def single_observation(self) -> np.ndarray:
-    #     return self.features[self.env.current_step, :]
-
     def step(self) -> np.ndarray:
         long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
         short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
@@ -110,92 +108,95 @@ class PublicObserver(ObserverScheme):
         return self.observation
 
 
-class MultiTimeframeObserver(ObserverScheme):
+class MultiTimeframeObserver:
     def __init__(
         self,
-        ohlcv: List[pd.DataFrame],
-        features: List[pd.DataFrame],
+        df_paths: Dict[str, str],
         window_size: int,
         **kwargs,
     ):
-        super().__init__(ohlcv, features, window_size)
-        self._observation_space = spaces.Box(
-            low=np.float32(-np.inf),
-            high=np.float32(np.inf),
-            shape=(window_size, self.features.shape[1] + 2),
+        assert len(df_paths) > 0, "No dataframe paths found"
+        self.prior_tf = next(iter(df_paths.keys()))  # tf --> timeframe
+
+        df = {key: pd.read_pickle(path) for key, path in df_paths.items()}
+        self.datetimes = {key: df[key].index for key in df.keys()}
+
+        self.ohlcv = {
+            k: d[["Open", "High", "Low", "Close", "Volume"]] for k, d in df.items()
+        }
+
+        fe_cols = [
+            col for col in df[self.prior_tf].columns if col.startswith("feture_")
+        ]
+        self.features = {key: d[fe_cols] for key, d in df.items()}
+
+        space_dict = {
+            key: spaces.Box(
+                -np.inf,
+                np.inf,
+                shape=(window_size, fe_df.shape[1]),
+                dtype=np.float32,
+            )
+            for key, fe_df in self.features.items()
+        }
+        space_dict["position"] = spaces.Box(
+            -np.inf,
+            np.inf,
+            shape=(2,),
             dtype=np.float32,
         )
-        self.positions = np.zeros((len(ohlcv), 2))
-        # self.positions = np.tile([0, 0], (self.window_size, len(ohlcv)))
+        self._observation_space = spaces.Dict(space_dict)
+        self.positions = np.zeros((len(self.ohlcv[self.prior_tf]), 2))
 
     @property
     def observation_space(self) -> spaces.Box:
         return self._observation_space
 
     @property
-    def observation(self) -> np.ndarray:
-        features_obs = self.features[
+    def observation(self) -> OrderedDict:
+        obs = OrderedDict(
+            [
+                (
+                    key,
+                    fe_df[
+                        self.env.current_step
+                        - self.env.window_size : self.env.current_step
+                    ],
+                )
+                for key, fe_df in self.features.items()
+            ]
+        )
+        obs["position"] = self.positions[
             self.env.current_step - self.env.window_size : self.env.current_step, :
         ]
-        position_obs = self.positions[
-            self.env.current_step - self.env.window_size : self.env.current_step, :
-        ]
-        obs = np.hstack((features_obs, position_obs))
         return obs
 
-    # @property
-    # def single_observation(self) -> np.ndarray:
-    #     return self.features[self.env.current_step, :]
-
-    def step(self) -> np.ndarray:
+    def step(self) -> OrderedDict:
         long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
         short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
         self.positions[self.env.current_step, :] = [long_position, short_position]
         return self.observation
 
-
-class NormObserver(ObserverScheme):
-    def __init__(
-        self,
-        ohlcv: pd.DataFrame,
-        features: pd.DataFrame,
-        window_size: int,
-        **kwargs,
-    ):
-        super().__init__(ohlcv, features, window_size)
-        self._observation_space = spaces.Box(
-            low=np.float32(-np.inf),
-            high=np.float32(np.inf),
-            shape=(window_size, self.features.shape[1]),
-            dtype=np.float32,
-        )
+    @property
+    def candlestick(self) -> np.ndarray:
+        return self.ohlcv[self.prior_key][self.env.current_step, :]
 
     @property
-    def observation_space(self) -> spaces.Box:
-        return self._observation_space
+    def prev_candlestick(self) -> np.ndarray:
+        return self.ohlcv[self.prior_key][self.env.current_step - 1, :]
 
     @property
-    def observation(self) -> np.ndarray:
-        features_obs = self.features[
-            self.env.current_step - self.env.window_size : self.env.current_step, :
-        ]
-        assert not np.isnan(features_obs).sum().all(), "Include NaN"
-        assert features_obs.shape == (
-            self.env.window_size,
-            self.features.shape[1],
-        ), f"{features_obs.shape}"
-        return features_obs
+    def datetime(self) -> pd.DatetimeIndex:
+        return self.datetimes[self.prior_key][self.env.current_step]
 
     @property
-    def single_observation(self) -> np.ndarray:
-        return self.features[self.current_step, :]
-
-    def step(self) -> np.ndarray:
-        return self.observation
+    def price(self) -> float:
+        return self.candlestick[3]
 
 
 registry = {
     "PublicObserver": PublicObserver,
+    "MultiTimeframeObserver": MultiTimeframeObserver,
 }
 
 
