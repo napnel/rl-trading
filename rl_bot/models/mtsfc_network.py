@@ -3,11 +3,11 @@ import tree  # pip install dm_tree
 from gym.spaces import Box, Discrete, MultiDiscrete
 from ray.rllib.models.catalog import ModelCatalog
 from ray.rllib.models.modelv2 import ModelV2, restore_original_dimensions
-
 # TODO (sven): add IMPALA-style option.
 # from ray.rllib.examples.models.impala_vision_nets import TorchImpalaVisionNet
 from ray.rllib.models.torch.misc import SlimFC
-from ray.rllib.models.torch.misc import normc_initializer as torch_normc_initializer
+from ray.rllib.models.torch.misc import \
+    normc_initializer as torch_normc_initializer
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.models.utils import get_filter_config
 from ray.rllib.policy.sample_batch import SampleBatch
@@ -61,13 +61,13 @@ class MTSFCNetwork(TorchModelV2, nn.Module):
         concat_size = 0
         for i, component in enumerate(self.flattened_input_space):
             size = int(np.product(component.shape))
-            hidden = 1
-            while hidden < size:
-                hidden *= 2
+            # hidden = 1
+            # while hidden < size:
+            #     hidden *= 2
 
             config = {
-                # "fcnet_hiddens": model_config["fcnet_hiddens"],
-                "fcnet_hiddens": hidden,
+                "fcnet_hiddens": model_config["fcnet_hiddens"],
+                # "fcnet_hiddens": [hidden, hidden],
                 "fcnet_activation": model_config.get("fcnet_activation"),
                 "post_fcnet_hiddens": [],
             }

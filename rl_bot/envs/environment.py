@@ -51,15 +51,17 @@ def create_components(config: Dict[str, Any]):
         config["stopper"],
     )
 
-    observer: observe.ObserverScheme = observe.get(obs_cfg["type"])(obs_cfg["kwargs"])
-    actions: action.ActionScheme = action.get(action_cfs["type"])(action_cfs["kwargs"])
+    observer: observe.ObserverScheme = observe.get(obs_cfg["type"])(**obs_cfg["kwargs"])
+    actions: action.ActionScheme = action.get(action_cfs["type"])(
+        **action_cfs["kwargs"]
+    )
     rewards: reward.RewardScheme = reward.get(rewards_cfs["type"])(
-        rewards_cfs["kwargs"]
+        **rewards_cfs["kwargs"]
     )
     informer: informe.InformerScheme = informe.get(informer_cfg["type"])(
-        informer_cfg["kwargs"]
+        **informer_cfg["kwargs"]
     )
-    stopper: stop.StopperScheme = stop.get(stopper_cfg["type"])(stopper_cfg["kwargs"])
+    stopper: stop.StopperScheme = stop.get(stopper_cfg["type"])(**stopper_cfg["kwargs"])
 
     return observer, actions, rewards, informer, stopper
 

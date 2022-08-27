@@ -7,7 +7,7 @@ class StopperScheme:
 
     def reset(self, env) -> bool:
         self.env = env
-        self.max_step = len(self.env.observer.ohlcv)
+        self.max_step = self.env.observer.max_steps
         return False
 
     def step(self) -> bool:

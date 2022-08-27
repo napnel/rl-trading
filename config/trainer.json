@@ -4,45 +4,63 @@
         "fee": 0.0001,
         "observer": {
             "type": "MultiTimeframeObserver",
-            "df_path": null,
-            "window_size": 30
+            "kwargs": {
+                "df_paths": {},
+                "step_multi": {},
+                "window_size": 30
+            }
         },
         "actions": {
-            "type": "MarketOrder"
+            "type": "MarketOrder",
+            "kwargs": {}
         },
         "rewards": {
-            "type": "DifferentialSharpRatio",
-            "window_size": 30
+            "type": "DSR",
+            "kwargs": {
+                "window_size": 30
+            }
         },
         "informer": {
-            "type": "PrivateInformer"
+            "type": "PrivateInformer",
+            "kwargs": {}
         },
         "stopper": {
-            "type": "DrawdownStoper",
-            "allowable_drawdown": 0.5
+            "type": "DrawdownStopper",
+            "kwargs": {
+                "allowable_drawdown": 0.5
+            }
         }
     },
     "evaluation_config": {
         "env_config": {
             "fee": 0.0001,
             "observer": {
-                "type": "PublicObserver",
-                "df_path": null,
-                "window_size": 30
+                "type": "MultiTimeframeObserver",
+                "kwargs": {
+                    "df_path": {},
+                    "step_multi": {},
+                    "window_size": 30
+                }
             },
             "actions": {
-                "type": "MarketOrder"
+                "type": "MarketOrder",
+                "kwargs": {}
             },
             "rewards": {
-                "type": "DifferentialSharpRatio",
-                "window_size": 30
+                "type": "DSR",
+                "kwargs": {
+                    "window_size": 30
+                }
             },
             "informer": {
-                "type": "PrivateInformer"
+                "type": "PrivateInformer",
+                "kwargs": {}
             },
             "stopper": {
-                "type": "DrawdownStoper",
-                "allowable_drawdown": 0.5
+                "type": "DrawdownStopper",
+                "kwargs": {
+                    "allowable_drawdown": 0.5
+                }
             }
         },
         "explore": false

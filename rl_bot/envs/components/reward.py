@@ -77,10 +77,10 @@ class DifferentialSharpeRatio(RewardScheme):
             return 0
 
         a_delta = r_t - self.a_t
-        b_delta = r_t ** 2 - self.b_t
+        b_delta = r_t**2 - self.b_t
 
         nominator = self.b_t * a_delta - (0.5 * self.a_t * b_delta)
-        denominator = (self.b_t - self.a_t ** 2) ** 1.5 + np.finfo("float64").eps
+        denominator = (self.b_t - self.a_t**2) ** 1.5 + np.finfo("float64").eps
 
         reward = nominator / denominator
         self.a_t = self.a_t + self.eta * a_delta

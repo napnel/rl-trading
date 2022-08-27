@@ -25,7 +25,7 @@ class PrivateInformer(InformerScheme):
 
 
 registry = {
-    "PriveteInformer": PrivateInformer,
+    "PrivateInformer": PrivateInformer,
 }
 
 

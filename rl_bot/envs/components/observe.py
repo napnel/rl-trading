@@ -62,6 +62,10 @@ class ObserverScheme:
     def datetime(self) -> pd.DatetimeIndex:
         return self._features.index
 
+    @property
+    def max_steps(self) -> int:
+        return len(self.ohlcv)
+
     def reset(self, env: "TradingEnv") -> np.ndarray:
         self.env = env
         return self.observation
@@ -112,21 +116,27 @@ class MultiTimeframeObserver:
     def __init__(
         self,
         df_paths: Dict[str, str],
+        step_multi: Dict[str, str],
         window_size: int,
         **kwargs,
     ):
         assert len(df_paths) > 0, "No dataframe paths found"
-        self.prior_tf = next(iter(df_paths.keys()))  # tf --> timeframe
+        self.window_size = window_size
+        self.prior_tf = next(iter(df_paths.keys()))  # tf := timeframe
 
-        df = {key: pd.read_pickle(path) for key, path in df_paths.items()}
+        df = {
+            key: pd.read_pickle(path).astype(np.float32)
+            for key, path in df_paths.items()
+        }
         self.datetimes = {key: df[key].index for key in df.keys()}
+        self.step_multi = step_multi
 
         self.ohlcv = {
             k: d[["Open", "High", "Low", "Close", "Volume"]] for k, d in df.items()
         }
 
         fe_cols = [
-            col for col in df[self.prior_tf].columns if col.startswith("feture_")
+            col for col in df[self.prior_tf].columns if col.startswith("feature_")
         ]
         self.features = {key: d[fe_cols] for key, d in df.items()}
 
@@ -142,14 +152,15 @@ class MultiTimeframeObserver:
         space_dict["position"] = spaces.Box(
             -np.inf,
             np.inf,
-            shape=(2,),
+            shape=(window_size, 2),
             dtype=np.float32,
         )
         self._observation_space = spaces.Dict(space_dict)
-        self.positions = np.zeros((len(self.ohlcv[self.prior_tf]), 2))
+        self.positions = np.zeros((len(self.ohlcv[self.prior_tf]), 2), dtype=np.float32)
+        self.steps = {key: 0 for key in self.ohlcv.keys()}
 
     @property
-    def observation_space(self) -> spaces.Box:
+    def observation_space(self) -> spaces.Dict:
         return self._observation_space
 
     @property
@@ -157,21 +168,29 @@ class MultiTimeframeObserver:
         obs = OrderedDict(
             [
                 (
-                    key,
-                    fe_df[
-                        self.env.current_step
-                        - self.env.window_size : self.env.current_step
-                    ],
+                    tf,
+                    fe_df.iloc[
+                        self.steps[tf] - self.env.window_size : self.steps[tf], :
+                    ].values,
                 )
-                for key, fe_df in self.features.items()
+                for tf, fe_df in self.features.items()
             ]
         )
         obs["position"] = self.positions[
             self.env.current_step - self.env.window_size : self.env.current_step, :
         ]
+        # obs = self.observation_space.sample()
         return obs
 
+    def reset(self, env: "TradingEnv") -> np.ndarray:
+        self.env = env
+        self.steps = {key: self.env.window_size for key in self.ohlcv.keys()}
+        return self.observation
+
     def step(self) -> OrderedDict:
+        for ts, multi in self.step_multi.items():
+            if (self.steps[ts] - self.env.window_size) % multi == 0:
+                self.steps[ts] += 1
         long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
         short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
         self.positions[self.env.current_step, :] = [long_position, short_position]
@@ -179,19 +198,23 @@ class MultiTimeframeObserver:
 
     @property
     def candlestick(self) -> np.ndarray:
-        return self.ohlcv[self.prior_key][self.env.current_step, :]
+        return self.ohlcv[self.prior_tf].iloc[self.env.current_step, :]
 
     @property
     def prev_candlestick(self) -> np.ndarray:
-        return self.ohlcv[self.prior_key][self.env.current_step - 1, :]
+        return self.ohlcv[self.prior_tf].iloc[self.env.current_step - 1, :]
 
     @property
     def datetime(self) -> pd.DatetimeIndex:
-        return self.datetimes[self.prior_key][self.env.current_step]
+        return self.datetimes[self.prior_tf][self.env.current_step]
 
     @property
     def price(self) -> float:
         return self.candlestick[3]
+
+    @property
+    def max_steps(self) -> int:
+        return len(self.ohlcv[self.prior_tf])
 
 
 registry = {
