@@ -52,12 +52,6 @@ class PnL(RewardScheme):
         return reward
 
 
-class RelativeLogReturn(RewardScheme):
-    def step(self) -> float:
-        reward = np.log(self.env.equity_curve[1]) - np.log(self.env.equity[-2])
-        long_log_return = self.env.observer.prev_candlestick
-
-
 class DifferentialSharpeRatio(RewardScheme):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -65,14 +59,27 @@ class DifferentialSharpeRatio(RewardScheme):
         self.b_t = None
         self.window_size = kwargs["window_size"]
         self.eta = 2 / (self.window_size + 1)
+        # self.eta = 0.01
 
     def reset(self, env: "TradingEnv"):
         super().reset(env)
         self.a_t = 0
         self.b_t = 0
+        init_returns = (
+            env.observer._ohlcv["Close"]
+            .iloc[0 : self.window_size]
+            .pct_change()
+            .fillna(0)
+        )
+        for i in range(self.window_size):
+            a_delta = init_returns.iloc[i] - self.a_t
+            b_delta = init_returns.iloc[i] ** 2 - self.b_t
+            self.a_t = self.a_t + self.eta * a_delta
+            self.b_t = self.b_t + self.eta * b_delta
 
     def step(self) -> float:
         r_t = self.env.position.pnl_pct
+        # r_t = np.log(self.env.equity_curve[-1]) - np.log(self.env.equity_curve[-2])
         if r_t == 0:
             return 0
 
@@ -83,10 +90,15 @@ class DifferentialSharpeRatio(RewardScheme):
         denominator = (self.b_t - self.a_t**2) ** 1.5 + np.finfo("float64").eps
 
         reward = nominator / denominator
+
+        # update
         self.a_t = self.a_t + self.eta * a_delta
         self.b_t = self.b_t + self.eta * b_delta
 
-        return reward
+        # if np.isnan(nominator) or nominator == 0 or denominator == 0:
+        #     return 0
+
+        return np.sign(reward) * np.log(np.abs(reward + np.finfo("float64").eps))
 
 
 registry = {

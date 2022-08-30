@@ -82,13 +82,29 @@ class PublicObserver(ObserverScheme):
         **kwargs,
     ):
         super().__init__(df_path, window_size)
-        self._observation_space = spaces.Box(
-            low=np.float32(-np.inf),
-            high=np.float32(np.inf),
-            shape=(window_size, self.features.shape[1] + 2),
-            dtype=np.float32,
+        # self._observation_space = spaces.Box(
+        #     low=np.float32(-np.inf),
+        #     high=np.float32(np.inf),
+        #     shape=(window_size, self.features.shape[1] + 2),
+        #     dtype=np.float32,
+        # )
+        self.positions = np.zeros((len(self.ohlcv), 2), dtype=np.float32)
+        self._observation_space = spaces.Dict(
+            {
+                "base": spaces.Box(
+                    -np.inf,
+                    np.inf,
+                    shape=(window_size, self.features.shape[1]),
+                    dtype=np.float32,
+                ),
+                "position": spaces.Box(
+                    -np.inf,
+                    np.inf,
+                    shape=(2,),
+                    dtype=np.float32,
+                ),
+            }
         )
-        self.positions = np.zeros((len(self.ohlcv), 2))
 
     @property
     def observation_space(self) -> spaces.Box:
@@ -96,19 +112,35 @@ class PublicObserver(ObserverScheme):
 
     @property
     def observation(self) -> np.ndarray:
-        features_obs = self.features[
-            self.env.current_step - self.env.window_size : self.env.current_step, :
-        ]
-        position_obs = self.positions[
-            self.env.current_step - self.env.window_size : self.env.current_step, :
-        ]
-        obs = np.hstack((features_obs, position_obs))
+        # features_obs = self.features[
+        #     self.env.current_step - self.env.window_size : self.env.current_step, :
+        # ]
+        # position_obs = self.positions[
+        #     self.env.current_step - self.env.window_size : self.env.current_step, :
+        # ]
+        # obs = np.hstack((features_obs, position_obs))
+        long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
+        short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
+        obs = OrderedDict(
+            [
+                (
+                    "base",
+                    self.features[
+                        self.env.current_step
+                        - self.env.window_size : self.env.current_step,
+                        :,
+                    ],
+                ),
+                (
+                    "position",
+                    np.array([long_position, short_position], dtype=np.float32),
+                ),
+            ]
+        )
+        # obs = self.observation_space.sample()
         return obs
 
     def step(self) -> np.ndarray:
-        long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
-        short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
-        self.positions[self.env.current_step, :] = [long_position, short_position]
         return self.observation
 
 

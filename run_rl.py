@@ -104,7 +104,7 @@ if __name__ == "__main__":
     ray.shutdown()
     ray.init(num_gpus=1, num_cpus=args.num_cpus)
     model_config = {
-        "fcnet_hiddens": [1024, 1024, 512, 256, 128],
+        # "fcnet_hiddens": [1024, 1024, 512, 256, 128],
         # "use_attention": True,
         # "custom_model": tune.grid_search(["TCNNetwork", None]),
         # "custom_model": "TCNNetwork",

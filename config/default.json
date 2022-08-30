@@ -26,7 +26,7 @@
         "stopper": {
             "type": "DrawdownStopper",
             "kwargs": {
-                "allowable_drawdown": 0.5
+                "allowable_drawdown": 0
             }
         }
     },
@@ -37,7 +37,7 @@
     "evaluation_interval": null,
     "evaluation_duration": 1,
     "evaluation_parallel_to_training": false,
-    "min_train_timesteps_per_iteration": 10000,
+    "min_train_timesteps_per_iteration": null,
     "min_sample_timesteps_per_iteration": null,
     "min_time_s_per_iteration": null,
     "log_level": "WARN",

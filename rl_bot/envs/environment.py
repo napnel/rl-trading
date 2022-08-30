@@ -67,7 +67,7 @@ def create_components(config: Dict[str, Any]):
 
 class TradingEnv(gym.Env):
 
-    spec = EnvSpec(id="TradingEnv-v1", max_episode_steps=1000000)
+    spec = EnvSpec(id="TradingEnv-v1", max_episode_steps=1000)
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
