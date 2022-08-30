@@ -1,26 +1,21 @@
 import argparse
+import copy
 import json
 import os
 import pickle
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from pprint import pprint
 
-import numpy as np
-import pandas as pd
 import ray
 from ray import tune
 from ray.rllib.agents import Trainer, ppo
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
-from ray.rllib.models.torch.visionnet import VisionNetwork
 from ray.tune.logger import (CSVLogger, JsonLogger, TBXLogger,
                              TBXLoggerCallback, UnifiedLogger, pretty_print)
-from ray.tune.registry import register_env
 from ray.tune.stopper import MaximumIterationStopper
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import RobustScaler
-from ta.volatility import average_true_range
 
 from rl_bot.backtest import backtest
 from rl_bot.callbacks import InvestmentCallbacks
@@ -35,8 +30,10 @@ from rl_bot.util import get_agent_class
 # from tensortrade.env.default import create
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--algo", default="DQN", type=str)
+parser.add_argument("--algo", default="APPO", type=str)
 parser.add_argument("--local_dir", default="./ray_results", type=str)
+parser.add_argument("--timesteps", default=10000, type=int)
+parser.add_argument("--iters", default=10, type=int)
 parser.add_argument("--expt-name", default=None, type=str)
 parser.add_argument("--num_samples", default=1, type=int)
 parser.add_argument("--num_cpus", default=os.cpu_count(), type=int)
@@ -107,6 +104,7 @@ if __name__ == "__main__":
     ray.shutdown()
     ray.init(num_gpus=1, num_cpus=args.num_cpus)
     model_config = {
+        "fcnet_hiddens": [1024, 1024, 512, 256, 128],
         # "use_attention": True,
         # "custom_model": tune.grid_search(["TCNNetwork", None]),
         # "custom_model": "TCNNetwork",
@@ -119,56 +117,62 @@ if __name__ == "__main__":
     }
 
     agent_class, trainer_config = get_agent_class(args.algo)
-    with open(CONFIG_PATH / "trainer.json", "r") as f:
-        trainer_config = json.load(f)
+    with open(CONFIG_PATH / "default.json", "r") as f:
+        trainer_config: dict = json.load(f)
         # trainer_config.update(config)
 
-    print(trainer_config)
     # trainer_config["num_workers"] = args.num_cpus - 1
     # trainer_config["num_gpus"] = 0
-    trainer_config["env_config"]["df_path"] = str(
-        DATA_PATH / "features" / "df_4H_train.pkl"
+    trainer_config["env_config"]["observer"]["kwargs"]["df_path"] = str(
+        DATA_PATH / "ohlcv_with_features" / "4H_train.pkl"
     )
-    trainer_config["evaluation_config"]["env_config"]["df_path"] = str(
-        DATA_PATH / "features" / "df_4H_test.pkl"
+    # Set for evaluation
+    env_config_eval = copy.deepcopy(trainer_config["env_config"])
+    env_config_eval["observer"]["kwargs"]["df_path"] = str(
+        DATA_PATH / "ohlcv_with_features" / "4H_test.pkl"
     )
+    trainer_config["evaluation_config"]["env_config"] = env_config_eval
+    trainer_config["evaluation_config"]["explore"] = False
+
     trainer_config["model"] = model_config
     trainer_config["callbacks"] = InvestmentCallbacks
     trainer_config["num_workers"] = args.num_cpus - 1
     checkpoint_path = args.cpt
+    pprint(trainer_config)
 
     if not args.test:
 
-        agent = agent_class(
-            config=trainer_config,
-            logger_creator=logger_creator("./ray_results", args.algo),
-        )
-        for _ in range(30):
-            results = agent.train()
-            print(pretty_print(results))
-            checkpoint_path = agent.save(f"./ray_results/{args.algo}")
-            metrics = results["custom_metrics"]
-            for key, values in metrics.items():
-                if "mean" in key:
-                    print(f"{key}: {values}")
+        # agent = agent_class(
+        #     config=trainer_config,
+        #     logger_creator=logger_creator("./ray_results", args.algo),
+        # )
+        # for _ in range(args.timesteps):
+        #     results = agent.train()
+        #     print(pretty_print(results))
+        #     checkpoint_path = agent.save(f"./ray_results/{args.algo}")
+        #     metrics = results["custom_metrics"]
+        #     for key, values in metrics.items():
+        #         if "mean" in key:
+        #             print(f"{key}: {values}")
 
         #     print("checkpoint:", checkpoint_path)
-        # analysis = train(
-        #     agent_class,
-        #     trainer_config,
-        #     stop={"timesteps_total": 1000000},
-        #     expt_name=args.expt_name,
-        #     num_samples=args.num_samples,
-        #     local_dir=args.local_dir,
-        #     resume=args.resume,
-        # )
-        # trial = analysis.get_best_trial()
-        # checkpoint_path = analysis.get_best_checkpoint(trial)
-        # trainer_config = analysis.get_best_config()
-        # print(trainer_config)
+        # stopper = MaximumIterationStopper(args.iters)
+        analysis = train(
+            agent_class,
+            trainer_config,
+            stop={"timesteps_total": args.timesteps},
+            expt_name=args.expt_name,
+            num_samples=args.num_samples,
+            local_dir=args.local_dir,
+            resume=args.resume,
+        )
+        trial = analysis.get_best_trial()
+        checkpoint_path = analysis.get_best_checkpoint(trial)
+        trainer_config = analysis.get_best_config()
+        print(trainer_config)
 
-    env_config_train = trainer_config["env_config"].copy()
-    env_config_eval = trainer_config["evaluation_config"]["env_config"].copy()
+    env_config_train = copy.deepcopy(trainer_config["env_config"])
+    env_config_eval = copy.deepcopy(trainer_config["evaluation_config"]["env_config"])
     env_train = TradingEnv(env_config_train)
     env_test = TradingEnv(env_config_eval)
 
@@ -179,7 +183,7 @@ if __name__ == "__main__":
     if checkpoint_path:
         agent.restore(checkpoint_path)
 
-    test(agent, env_test)
+    # test(agent, env_test)
     backtest(env_train, agent, debug=False, plot=True, save_dir=str(TMP_PATH / "train"))
     backtest(env_test, agent, debug=False, plot=True, save_dir=str(TMP_PATH / "test"))
 

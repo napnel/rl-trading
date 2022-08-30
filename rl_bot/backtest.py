@@ -129,4 +129,4 @@ def backtest(
     stats = bt.run(env=env, agent=agent, debug=debug)
     print(stats)
     if plot and save_dir is not None:
-        bt.plot(open_browser=False, filename=save_dir)
+        bt.plot(open_browser=False, filename=save_dir, superimpose=False)

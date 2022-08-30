@@ -24,8 +24,8 @@ def train(
     #     IS_NOTEBOOK = False
     reporter = CLIReporter(
         metric_columns={
-            "episode_reward_mean": "episode_reward",
-            "evaluation/episode_reward_mean": "eval/episode_reward",
+            "episode_reward_mean": "ep_reward",
+            "evaluation/episode_reward_mean": "eval/ep_reward",
             "timesteps_total": "steps",
             "episodes_total": "episodes",
         },
@@ -51,7 +51,7 @@ def train(
         checkpoint_at_end=True,
         progress_reporter=reporter,
         local_dir=local_dir,
-        # verbose=1,
+        verbose=1,
         name=expt_name,
         resume=resume,
         num_samples=num_samples,

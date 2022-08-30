@@ -40,7 +40,7 @@ def create_ohlcv(df: pd.DataFrame, rule: str):
     return ohlcv
 
 
-def tranc_to_ohlcv(pairs: List[str], rules: List[str]):
+def transac_to_ohlcv(pairs: List[str], rules: List[str]):
     """Transaction to OHLCV
     params:
         pairs: List[str] - BTCUSDT, ETHUSDT, ...
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         "--rules",
         nargs="+",
         type=str,
-        default=["1T", "3T", "5T", "15H", "1H", "4H", "1D"],
+        default=["5T", "15H", "1H", "4H", "1D"],
     )
     args = parser.parse_args()
-    tranc_to_ohlcv(args.pairs, args.rules)
+    transac_to_ohlcv(args.pairs, args.rules)

@@ -39,7 +39,9 @@ def download_transactions(url: Path, filename: str, save_path: Path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pairs", type=str, nargs="+", default=["BTCUSDT", "ETHUSDT"])
-    parser.add_argument("--years", type=str, nargs="+", default=["2021", "2022"])
+    parser.add_argument(
+        "--years", type=str, nargs="+", default=["2021", "2022"]
+    )
     args = parser.parse_args()
 
     ray.init()

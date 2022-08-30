@@ -1,0 +1,48 @@
+{
+    "env": "TradingEnv-v1",
+    "env_config": {
+        "fee": 0.0001,
+        "observer": {
+            "type": "PublicObserver",
+            "kwargs": {
+                "df_path": null,
+                "window_size": 30
+            }
+        },
+        "actions": {
+            "type": "MarketOrder",
+            "kwargs": {}
+        },
+        "rewards": {
+            "type": "DSR",
+            "kwargs": {
+                "window_size": 30
+            }
+        },
+        "informer": {
+            "type": "PrivateInformer",
+            "kwargs": {}
+        },
+        "stopper": {
+            "type": "DrawdownStopper",
+            "kwargs": {
+                "allowable_drawdown": 0.5
+            }
+        }
+    },
+    "evaluation_config": {
+        "env_config": {},
+        "explore": false
+    },
+    "evaluation_interval": null,
+    "evaluation_duration": 1,
+    "evaluation_parallel_to_training": false,
+    "min_train_timesteps_per_reporting": 10000,
+    "min_sample_timesteps_per_reporting": null,
+    "min_time_s_per_reporting": null,
+    "log_level": "WARN",
+    "framework": "torch",
+    "callbacks": null,
+    "model": {},
+    "seed": 3407
+}

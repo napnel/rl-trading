@@ -75,6 +75,6 @@
     "framework": "torch",
     "callbacks": null,
     "model": {},
-    "horizon": 10000,
+    "horizon": 300,
     "seed": 3407
 }

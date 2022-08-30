@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from gym.envs.registration import EnvSpec, register
 from rl_bot.envs.components import action, informe, observe, reward, stop
-
 # from rl_bot.envs.components.action import ActionScheme, MarketOrder
 # from rl_bot.envs.components.informe import InformerScheme, PrivateInformer
 # from rl_bot.envs.components.observe import ObserverScheme, PublicObserver
@@ -68,7 +67,7 @@ def create_components(config: Dict[str, Any]):
 
 class TradingEnv(gym.Env):
 
-    spec = EnvSpec(id="TradingEnv-v1", max_episode_steps=1000)
+    spec = EnvSpec(id="TradingEnv-v1", max_episode_steps=1000000)
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
@@ -502,5 +501,5 @@ class TradingEnv(gym.Env):
 register(
     id="TradingEnv-v1",
     entry_point="rl_bot.envs:TradingEnv",
-    max_episode_steps=1000,
+    # max_episode_steps=100,
 )

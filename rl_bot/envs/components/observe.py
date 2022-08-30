@@ -20,9 +20,9 @@ class ObserverScheme:
         df: pd.DataFrame = pd.read_pickle(df_path)
         ohlcv = df[["Open", "High", "Low", "Close", "Volume"]]
         # features = df.drop(["Open", "High", "Low", "Close", "Volume"], axis=1)
-        fe_cols = [col for col in df.columns if col.startswith("feture_")]
+        fe_cols = [col for col in df.columns if col.startswith("feature_")]
         features = df[fe_cols]
-        assert features.shape[1] > 0, "No features found"
+        assert features.shape[1] > 0, f"No features found, {features.columns}"
         assert len(ohlcv) == len(features), "lenth of ohlcv and features is diffrent"
 
         self.env: "TradingEnv" = None
@@ -189,7 +189,7 @@ class MultiTimeframeObserver:
 
     def step(self) -> OrderedDict:
         for ts, multi in self.step_multi.items():
-            if (self.steps[ts] - self.env.window_size) % multi == 0:
+            if (self.steps[ts] - self.steps[self.prior_tf]) % multi == 0:
                 self.steps[ts] += 1
         long_position = self.env.position.pnl_pct if self.env.position.is_long else 0
         short_position = self.env.position.pnl_pct if self.env.position.is_short else 0
