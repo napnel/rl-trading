@@ -10,7 +10,7 @@ from pprint import pprint
 
 import ray
 from ray import tune
-from ray.rllib.agents import Trainer, ppo
+from ray.rllib.agents import Trainer
 from ray.rllib.models import ModelCatalog
 from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
 from ray.tune.logger import (CSVLogger, JsonLogger, TBXLogger,

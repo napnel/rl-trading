@@ -1,31 +1,29 @@
 import pathlib
 from typing import Any, Dict
 
-from ray.rllib.agents import a3c, ddpg, dqn, impala, ppo, sac
-from ray.rllib.agents.a3c import a2c
-from ray.rllib.agents.ppo import appo
+from ray.rllib.algorithms import a2c, a3c, appo, ddpg, dqn, impala, ppo, sac
 
 
 def get_agent_class(algo: str, _config: Dict[str, Any] = None):
 
     if algo == "DQN":
-        agent = dqn.DQNTrainer
+        agent = dqn.DQN
         config = dqn.DEFAULT_CONFIG.copy()
 
     elif algo == "A2C":
-        agent = a2c.A2CTrainer
+        agent = a2c.A2C
         config = a2c.A2C_DEFAULT_CONFIG.copy()
 
     elif algo == "A3C":
-        agent = a3c.A3CTrainer
+        agent = a3c.A3C
         config = a3c.DEFAULT_CONFIG.copy()
 
     elif algo == "PPO":
-        agent = ppo.PPOTrainer
+        agent = ppo.PPO
         config = ppo.DEFAULT_CONFIG.copy()
 
     elif algo == "SAC":
-        agent = sac.SACTrainer
+        agent = sac.SAC
         config = sac.DEFAULT_CONFIG.copy()
         config["optimization"]["actor_learning_rate"] = _config["lr"]
         config["optimization"]["critic_learning_rate"] = _config["lr"]
@@ -44,15 +42,15 @@ def get_agent_class(algo: str, _config: Dict[str, Any] = None):
         _config.pop("model")
 
     elif algo == "DDPG":
-        agent = ddpg.DDPGTrainer
+        agent = ddpg.DDPG
         config = ddpg.DEFAULT_CONFIG.copy()
 
     elif algo == "APPO":
-        agent = ppo.APPOTrainer
+        agent = appo.APPO
         config = appo.DEFAULT_CONFIG.copy()
 
     elif algo == "IMPARA":
-        agent = impala.ImpalaTrainer
+        agent = impala.Impala
         config = impala.DEFAULT_CONFIG.copy()
 
     else:
