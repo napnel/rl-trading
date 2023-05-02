@@ -5,7 +5,7 @@ from typing import Optional
 import pandas as pd
 import yfinance as yf
 
-# from rl_bot.preprocessor import Preprocessor
+# from rl_trading.preprocessor import Preprocessor
 
 
 class DataLoader:

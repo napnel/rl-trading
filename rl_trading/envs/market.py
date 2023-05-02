@@ -5,84 +5,36 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import gym
 import numpy as np
-import pandas as pd
-from gym.envs.registration import EnvSpec, register
-from rl_bot.envs.components import action, informe, observe, reward, stop
-# from rl_bot.envs.components.action import ActionScheme, MarketOrder
-# from rl_bot.envs.components.informe import InformerScheme, PrivateInformer
-# from rl_bot.envs.components.observe import ObserverScheme, PublicObserver
-# from rl_bot.envs.components.reward import (DifferentialSharpeRatio, LogReturn,
-#                                            RewardScheme)
-# from rl_bot.envs.components.stop import DrawdownStopper, StopperScheme
-from rl_bot.envs.core import Order, Position, Trade
-
-# def create_components(config: Dict[str, Any]):
-#     """Create components from config."""
-#     df: pd.DataFrame = pd.read_pickle(config["df_path"])
-#     assert set(df.columns) >= set(["Open", "High", "Low", "Close", "Volume"])
-#     ohlcv = df[["Open", "High", "Low", "Close", "Volume"]]
-#     features = df.drop(["Open", "High", "Low", "Close", "Volume"], axis=1)
-#     assert features.shape[1] > 0, "No features found"
-
-#     observer: ObserverScheme = PublicObserver(
-#         ohlcv=ohlcv,
-#         features=features,
-#         window_size=config["window_size"],
-#     )
-#     actions: ActionScheme = MarketOrder()
-#     # rewards: RewardScheme = LogReturn()
-#     rewards: RewardScheme = DifferentialSharpeRatio(window_size=config["window_size"])
-#     informer: InformerScheme = PrivateInformer()
-#     stopper: StopperScheme = DrawdownStopper(
-#         allowable_drawdown=config["allowable_drawdown"]
-#     )
-#     return observer, actions, rewards, informer, stopper
+from rl_trading.envs.components.action import ActionScheme
+from rl_trading.envs.components.informe import InformerScheme
+from rl_trading.envs.components.observe import ObserverScheme
+from rl_trading.envs.components.reward import RewardScheme
+from rl_trading.envs.components.stop import StopperScheme
+from rl_trading.envs.core import Order, Position, Trade
 
 
-def create_components(config: Dict[str, Any]):
-    """Create components from config."""
+class MarketEnv(gym.Env):
+    def __init__(
+        self,
+        actions: ActionScheme,
+        observer: ObserverScheme,
+        rewards: RewardScheme,
+        stopper: StopperScheme,
+        informer: InformerScheme,
+        *,
+        window_size: int,
+        fee: float,
+    ):
+        self.actions = actions
+        self.rewards = rewards
+        self.observer = observer
+        self.informer = informer
+        self.stopper = stopper
+        self.window_size = window_size
+        self.fee = fee
 
-    obs_cfg, action_cfs, rewards_cfs, informer_cfg, stopper_cfg = (
-        config["observer"],
-        config["actions"],
-        config["rewards"],
-        config["informer"],
-        config["stopper"],
-    )
-
-    observer: observe.ObserverScheme = observe.get(obs_cfg["type"])(**obs_cfg["kwargs"])
-    actions: action.ActionScheme = action.get(action_cfs["type"])(
-        **action_cfs["kwargs"]
-    )
-    rewards: reward.RewardScheme = reward.get(rewards_cfs["type"])(
-        **rewards_cfs["kwargs"]
-    )
-    informer: informe.InformerScheme = informe.get(informer_cfg["type"])(
-        **informer_cfg["kwargs"]
-    )
-    stopper: stop.StopperScheme = stop.get(stopper_cfg["type"])(**stopper_cfg["kwargs"])
-
-    return observer, actions, rewards, informer, stopper
-
-
-class TradingEnv(gym.Env):
-
-    spec = EnvSpec(id="TradingEnv-v1", max_episode_steps=1000)
-
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        (
-            self.observer,
-            self.actions,
-            self.rewards,
-            self.informer,
-            self.stopper,
-        ) = create_components(config)
-        self.fee = config["fee"]
-        self.window_size = self.observer.window_size
-
-        self.current_step = self.window_size
-        self.initial_cash = 1000000
+        self.current_step = 0
+        self.initial_cash = 100000
         self.cash = self.initial_cash
         self.position: Optional[Position] = Position(self)
         self.orders: List[Order] = []
@@ -95,11 +47,6 @@ class TradingEnv(gym.Env):
         self.action_space = self.actions.action_space
         self.observation_space = self.observer.observation_space
 
-        self._leverage = 1
-        self._hedging = False
-        self._exclusive_orders = True
-        self._trade_on_close = True
-
     def reset(self) -> np.ndarray:
         self.current_step = self.window_size
         self.action = None
@@ -108,7 +55,7 @@ class TradingEnv(gym.Env):
         self.position = Position(self)
         self.orders = []
         self.trades = []
-        self.equity_curve = [self.equity] * (self.window_size + 1)
+        self.equity_curve = [self.equity]
         self.closed_trades = []
 
         self.actions.reset(self)
@@ -122,23 +69,20 @@ class TradingEnv(gym.Env):
     def step(
         self, action: np.ndarray
     ) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
-        self.actions.step(action)
+        self.action = action
+        self.actions.step(self.action)
 
         self._process_orders()  # step += 1
 
-        obs = self.observer.step()
-        reward = self.rewards.step()
-        done = self.stopper.step()
-        info = self.informer.step()
-        return obs, reward, done, info
+        self.obs = self.observer.step()
+        self.reward = self.rewards.step()
+        self.done = self.stopper.step()
+        self.info = self.informer.step()
+        return self.obs, self.reward, self.done, self.info
 
     def render(self, mode="human"):
-        print(
-            "===" * 5,
-            f"Environment ({self.observer.datetime[self.current_step]})",
-            "===" * 5,
-        )
-        print(f"Price: {self.current_price}")
+        print("===" * 5, f"Environment ({self.current_step})", "===" * 5)
+        print(f"Price: {self.observer.price}")
         print(f"Cash: {self.cash}")
         print(f"Equity: {self.equity}")
         print(f"Orders: {self.orders}")
@@ -148,16 +92,16 @@ class TradingEnv(gym.Env):
         print(f"Action: {self.action}, Reward: {self.reward}, Done: {self.done}\n")
 
     @property
+    def tech_indicators(self):
+        return self.features.columns.tolist()
+
+    @property
     def equity(self) -> float:
         return self.cash + sum(trade.pnl for trade in self.trades)
 
     @property
-    def current_price(self) -> float:
-        return self.observer.price
-
-    @property
     def margin_available(self) -> float:
-        margin_used = sum(trade.value / self._leverage for trade in self.trades)
+        margin_used = sum(trade.value for trade in self.trades)
         return max(0, self.equity - margin_used)
 
     class __FULL_EQUITY(float):
@@ -169,24 +113,24 @@ class TradingEnv(gym.Env):
     def buy(
         self,
         size: Optional[float] = _FULL_EQUITY,
-        limit: Optional[float] = None,
-        stop: Optional[float] = None,
+        limit_price: Optional[float] = None,
+        stop_price: Optional[float] = None,
         sl: float = None,
         tp: float = None,
     ):
         assert 0 < size < 1 or round(size) == size, f"size: {size}"
-        return self.new_order(size, limit, stop, sl, tp)
+        return self.new_order(size, limit_price, stop_price, sl, tp)
 
     def sell(
         self,
         size: Optional[float] = _FULL_EQUITY,
-        limit: Optional[float] = None,
-        stop: Optional[float] = None,
+        limit_price: Optional[float] = None,
+        stop_price: Optional[float] = None,
         sl: float = None,
         tp: float = None,
     ):
         assert 0 < size < 1 or round(size) == size, f"size: {size}"
-        return self.new_order(-size, limit, stop, sl, tp)
+        return self.new_order(-size, limit_price, stop_price, sl, tp)
 
     def new_order(
         self,
@@ -224,18 +168,12 @@ class TradingEnv(gym.Env):
         if trade:
             self.orders.insert(0, order)
         else:
-            if self._exclusive_orders:
-                for o in self.orders:
-                    if not o.is_contingent:
-                        o.cancel()
-                for t in self.trades:
-                    t.close()
             self.orders.append(order)
 
         return order
 
     def _adjusted_price(self, size: int, price: Optional[float] = None) -> float:
-        return (price or self.current_price) * (1 + copysign(self.fee, size))
+        return (price or self.observer.price) * (1 + copysign(self.fee, size))
 
     def _process_orders(self):
         self.current_step += 1
@@ -251,7 +189,6 @@ class TradingEnv(gym.Env):
 
         # Process orders
         for order in list(self.orders):  # type: Order
-
             # Related SL/TP order was already removed
             if order not in self.orders:
                 continue
@@ -293,7 +230,7 @@ class TradingEnv(gym.Env):
                 )
             else:
                 # Market-if-touched / market order
-                price = prev_close if self._trade_on_close else open
+                price = prev_close
                 price = (
                     max(price, stop_price or -np.inf)
                     if order.is_long
@@ -303,9 +240,7 @@ class TradingEnv(gym.Env):
             # Determine entry/exit bar index
             is_market_order = not order.limit and not stop_price
             time_index = (
-                (self.current_step - 1)
-                if is_market_order and self._trade_on_close
-                else self.current_step
+                (self.current_step - 1) if is_market_order else self.current_step
             )
 
             # If order is a SL/TP order, it should close an existing trade it was contingent upon
@@ -339,10 +274,7 @@ class TradingEnv(gym.Env):
             size = order.size
             if -1 < size < 1:
                 size = copysign(
-                    int(
-                        (self.margin_available * self._leverage * abs(size))
-                        // adjusted_price
-                    ),
+                    int((self.margin_available * abs(size)) // adjusted_price),
                     size,
                 )
                 # Not enough cash/margin even for a single unit
@@ -352,31 +284,30 @@ class TradingEnv(gym.Env):
             assert size == round(size)
             need_size = int(size)
 
-            if not self._hedging:
-                # Fill position by FIFO closing/reducing existing opposite-facing trades.
-                # Existing trades are closed at unadjusted price, because the adjustment
-                # was already made when buying.
-                for trade in list(self.trades):
-                    if trade.is_long == order.is_long:
-                        continue
-                    assert trade.size * order.size < 0
+            # Fill position by FIFO closing/reducing existing opposite-facing trades.
+            # Existing trades are closed at unadjusted price, because the adjustment
+            # was already made when buying.
+            for trade in list(self.trades):
+                if trade.is_long == order.is_long:
+                    continue
+                assert trade.size * order.size < 0
 
-                    # Order size greater than this opposite-directed existing trade,
-                    # so it will be closed completely
-                    if abs(need_size) >= abs(trade.size):
-                        self._close_trade(trade, price, time_index)
-                        need_size += trade.size
-                    else:
-                        # The existing trade is larger than the new order,
-                        # so it will only be closed partially
-                        self._reduce_trade(trade, price, need_size, time_index)
-                        need_size = 0
+                # Order size greater than this opposite-directed existing trade,
+                # so it will be closed completely
+                if abs(need_size) >= abs(trade.size):
+                    self._close_trade(trade, price, time_index)
+                    need_size += trade.size
+                else:
+                    # The existing trade is larger than the new order,
+                    # so it will only be closed partially
+                    self._reduce_trade(trade, price, need_size, time_index)
+                    need_size = 0
 
-                    if not need_size:
-                        break
+                if not need_size:
+                    break
 
             # If we don't have enough liquidity to cover for the order, cancel it
-            if abs(need_size) * adjusted_price > self.margin_available * self._leverage:
+            if abs(need_size) * adjusted_price > self.margin_available:
                 self.orders.remove(order)
                 continue
 
@@ -396,6 +327,7 @@ class TradingEnv(gym.Env):
                         low <= (order.sl or -np.inf) <= high
                         or low <= (order.tp or -np.inf) <= high
                     ):
+                        print(data.index[-1])
                         warnings.warn(
                             f"({data.index[-1]}) A contingent SL/TP order would execute in the "
                             "same bar its parent stop/limit order was turned into a trade. "
@@ -454,52 +386,3 @@ class TradingEnv(gym.Env):
             trade.tp = tp
         if sl:
             trade.sl = sl
-
-    @property
-    def equity_curve_series(self) -> pd.Series:
-        return pd.Series(self.equity_curve, index=self.observer.datetime)
-
-    @property
-    def ohlcv_df(self) -> pd.DataFrame:
-        return self.observer._ohlcv
-
-    @property
-    def investment_stats(self) -> pd.Series:
-        equity_curve = pd.Series(self.equity_curve)
-        ohlcv = self.observer.ohlcv
-        stats = pd.Series()
-        stats.loc["Return"] = equity_curve.iloc[-1] / equity_curve.iloc[0] - 1
-        stats.loc["Buy & Hold"] = ohlcv.iloc[-1] / ohlcv.iloc[0] - 1
-        stats.loc["Sharpe"] = equity_curve.mean() / equity_curve.std()
-        return stats
-
-    @property
-    def trade_df(self) -> pd.DataFrame:
-        trade_df = pd.DataFrame(
-            {
-                "Size": [t.size for t in self.trades],
-                "EntryPrice": [t.entry_price for t in self.trades],
-                "ExitPrice": [t.exit_price for t in self.trades],
-                "PnL": [t.pnl for t in self.trades],
-                "ReturnPct": [t.pnl_pct for t in self.trades],
-                "EntryTime": [t.entry_time for t in self.trades],
-                "ExitTime": [t.exit_time for t in self.trades],
-            }
-        )
-        return trade_df
-
-    @property
-    def trade_stats(self) -> pd.Series:
-        trade_df = self.trade_df
-        stats = pd.Series()
-        stats.loc["# Trade"] = trade_df
-        stats.loc["Win Rate"] = trade_df.PnL.sum() / trade_df.Size.sum()
-        stats.loc["Avg. Trade size"] = trade_df.Size.sum() / len(trade_df)
-        return stats
-
-
-register(
-    id="TradingEnv-v1",
-    entry_point="rl_bot.envs:TradingEnv",
-    # max_episode_steps=100,
-)

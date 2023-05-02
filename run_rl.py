@@ -10,24 +10,24 @@ from pprint import pprint
 
 import ray
 from ray import tune
-from ray.rllib.agents import Trainer
+from ray.rllib.algorithms import Algorithm
 from ray.rllib.models import ModelCatalog
-from ray.rllib.models.torch.recurrent_net import RecurrentNetwork
-from ray.tune.logger import (CSVLogger, JsonLogger, TBXLogger,
-                             TBXLoggerCallback, UnifiedLogger, pretty_print)
-from ray.tune.stopper import MaximumIterationStopper
+from ray.tune.logger import (
+    CSVLogger,
+    JsonLogger,
+    TBXLogger,
+    UnifiedLogger,
+)
 
-from rl_bot.backtest import backtest
-from rl_bot.callbacks import InvestmentCallbacks
-# from rl_bot.envs import create_env
-from rl_bot.envs.environment import TradingEnv
-from rl_bot.models.batch_norm import BatchNormModel
-from rl_bot.models.rnn_network import RNNNetwork
-from rl_bot.models.tcn import TCNNetwork
-from rl_bot.train import train
-from rl_bot.util import get_agent_class
+from rl_trading.backtest import backtest
+from rl_trading.callbacks import InvestmentCallbacks
 
-# from tensortrade.env.default import create
+from rl_trading.envs.environment import TradingEnv
+from rl_trading.models.batch_norm import BatchNormModel
+from rl_trading.models.rnn_network import RNNNetwork
+from rl_trading.models.tcn import TCNNetwork
+from rl_trading.train import train
+from rl_trading.util import get_agent_class
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--algo", default="APPO", type=str)
@@ -61,12 +61,10 @@ tune.register_env("TradingEnv-v1", lambda config: TradingEnv(config))
 
 
 def logger_creator(custom_path, custom_str):
-
     timestr = datetime.today().strftime("%Y-%m-%d_%H-%M-%S")
     logdir_prefix = "{}_{}".format(custom_str, timestr)
 
     def logger_creator(config):
-
         if not os.path.exists(custom_path):
             os.makedirs(custom_path)
         logdir = tempfile.mkdtemp(prefix=logdir_prefix, dir=custom_path)
@@ -75,7 +73,7 @@ def logger_creator(custom_path, custom_str):
     return logger_creator
 
 
-def test(agent: Trainer, env: TradingEnv):
+def test(agent: Algorithm, env: TradingEnv):
     obs = env.reset()
     done = False
     while not done:
@@ -141,7 +139,6 @@ if __name__ == "__main__":
     pprint(trainer_config)
 
     if not args.test:
-
         # agent = agent_class(
         #     config=trainer_config,
         #     logger_creator=logger_creator("./ray_results", args.algo),

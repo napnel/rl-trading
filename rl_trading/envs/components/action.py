@@ -4,7 +4,7 @@ import numpy as np
 from gym import spaces
 
 if TYPE_CHECKING:
-    from rl_bot.envs.environment import TradingEnv
+    from rl_trading.envs.environment import TradingEnv
 
 
 class ActionScheme:

@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from ray import tune
 
-from rl_bot.util import prepare_config_for_agent
+from rl_trading.util import prepare_config_for_agent
 
 
 class ExperimentCV(tune.Trainable):

@@ -7,10 +7,10 @@ import pandas as pd
 import ray
 from ray.tune import ExperimentAnalysis
 
-from rl_bot.backtest import backtest
-from rl_bot.envs import TradingEnv
-from rl_bot.tuning_space import get_tuning_params
-from rl_bot.util import prepare_config_for_agent
+from rl_trading.backtest import backtest
+from rl_trading.envs import TradingEnv
+from rl_trading.tuning_space import get_tuning_params
+from rl_trading.util import prepare_config_for_agent
 
 
 def get_expt_results_cv(analysis: ExperimentAnalysis):

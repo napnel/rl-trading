@@ -2,8 +2,8 @@
 
 # import pandas as pd
 # from ray.tune.registry import register_env
-# from rl_bot.envs.components import action, informe, observe, reward, stop
-# from rl_bot.envs.environment import TradingEnv
+# from rl_trading.envs.components import action, informe, observe, reward, stop
+# from rl_trading.envs.environment import TradingEnv
 
 # # from components import action, informe, observe, reward, stop
 

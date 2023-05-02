@@ -3,8 +3,8 @@ from typing import Any, Dict
 import ray
 from ray.rllib.agents import Trainer
 
-from rl_bot.backtest import backtest
-from rl_bot.envs import create_env
+from rl_trading.backtest import backtest
+from rl_trading.envs import create_env
 
 
 def simulate(

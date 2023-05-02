@@ -5,13 +5,13 @@ from typing import Optional
 
 import pandas as pd
 
-from rl_bot.envs.environment import TradingEnv
+from rl_trading.envs.environment import TradingEnv
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", UserWarning)
     from backtesting import Backtest, Strategy
 
-from rl_bot.envs.components import action
+from rl_trading.envs.components import action
 
 
 class DRLStrategy(Strategy):
@@ -117,7 +117,6 @@ def backtest(
     open_browser: bool = True,
     debug: bool = True,
 ) -> pd.DataFrame:
-
     bt = Backtest(
         env.observer._ohlcv,
         DRLStrategy,

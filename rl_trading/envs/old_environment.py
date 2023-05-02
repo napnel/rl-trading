@@ -14,8 +14,6 @@ from envs.core import Order, Position, Trade
 from envs.reward_func import equity_log_return_reward
 
 
-
-
 class TradingEnv(gym.Env):
     def __init__(
         self,
